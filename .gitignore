@@ -1,0 +1,57 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments (the big one: VideoJev/.venv is ~8 GB)
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Caches / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.deps*
+
+# ---- ML / data artifacts ----
+# Model weights & checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.gguf
+models/
+checkpoints/
+
+# Datasets, feature caches, run outputs & reports
+data/
+feature_cache/
+runs/
+reports/
+outputs/
+wandb/
+
+# Media
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Logs
+*.log
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

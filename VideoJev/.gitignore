@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.deps*
+.env
+.env.*
+data/
+models/
+feature_cache/
+runs/
+reports/
+*.pt
+*.pth
+*.safetensors
+*.log
