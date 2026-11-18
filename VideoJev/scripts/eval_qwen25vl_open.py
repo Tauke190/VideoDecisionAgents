@@ -57,6 +57,42 @@ def sample_frames(path, num_frames):
     return np.stack(frames), indices, total, fps, duration
 
 
+def sample_frames_window(path, num_frames, t0, t1):
+    """Like sample_frames, but seek num_frames uniformly spaced indices restricted to the
+    [t0, t1] second window (the grounder's top-1 clip), clamped to the video. A degenerate
+    or tiny window still yields num_frames (repeated frames); frames never leave the clip."""
+    import av
+    with av.open(str(path)) as container:
+        stream = container.streams.video[0]
+        stream.thread_type, stream.thread_count = 'AUTO', 4
+        fps = float(stream.average_rate or stream.guessed_rate)
+        duration = (float(stream.duration*stream.time_base) if stream.duration else
+                    float(container.duration/av.time_base))
+        total = stream.frames or int(duration*fps)
+        lo, hi = sorted((max(0., float(t0)), max(0., float(t1))))
+        i0 = min(max(int(round(lo*fps)), 0), total-1)
+        i1 = min(max(int(round(hi*fps)), 0), total-1)
+        if i1 < i0:
+            i0, i1 = i1, i0
+        indices = np.clip(np.linspace(i0, i1, num_frames).round().astype(int), 0, total-1)
+        start = float(stream.start_time*stream.time_base) if stream.start_time is not None else 0.
+        width, height = stream.codec_context.width, stream.codec_context.height
+        frames, last = [], None
+        for index in indices:
+            target = start + index/fps
+            container.seek(int(target/stream.time_base), stream=stream, backward=True, any_frame=False)
+            frame = None
+            for candidate in container.decode(stream):
+                frame = candidate
+                if candidate.pts is not None and float(candidate.pts*stream.time_base) >= target - .5/fps:
+                    break
+            last = fitted(frame, width, height) if frame is not None else last
+            if last is None:
+                raise ValueError(f'Could not decode frames: {path}')
+            frames.append(last)
+    return np.stack(frames), indices, total, fps, duration
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--questions', required=True)

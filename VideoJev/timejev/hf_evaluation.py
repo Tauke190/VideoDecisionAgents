@@ -66,6 +66,12 @@ def evaluation_inputs(args):
         else:
             manifest = Path(args.manifest) if args.manifest else Path(args.data_root)/name/'questions.jsonl'
         rows = load_manifest(manifest)
+        if getattr(args, 'limit_videos', None):
+            # Quick smoke tests: keep every question of a seeded random subset of videos.
+            import random
+            keys = sorted({r['video_key'] for r in rows})
+            keep = set(random.Random(args.limit_seed).sample(keys, min(args.limit_videos, len(keys))))
+            rows = [r for r in rows if r['video_key'] in keep]
         reference = None
         if name != 'custom':
             expected_task = 'choice' if name in QA else 'grounding'
@@ -123,7 +129,7 @@ def score_predictions(name, predictions, rows, reference, out, qa_context=QA_CON
 
 
 def predict_rows(model, processor, rows, grounding_context, threshold, plan=None,
-                 qa_context=QA_CONTEXT, qa_fps=2., max_frames=2048, rank=0):
+                 qa_context=QA_CONTEXT, qa_fps=2., max_frames=2048, rank=0, grounding_fps=4.):
     """Bounded RGB preprocessing; labels never enter the model input."""
     import torch
     from tqdm import tqdm
@@ -149,7 +155,7 @@ def predict_rows(model, processor, rows, grounding_context, threshold, plan=None
                     raise ValueError('Plan must use 2-FPS QA / 4-FPS grounding and at most 2048 frames')
             else:
                 record = metadata(questions[0], 'lvbench' if task == 'choice' else 'charades',
-                                  fps=qa_fps if task == 'choice' else None, max_frames=max_frames)
+                                  fps=qa_fps if task == 'choice' else grounding_fps, max_frames=max_frames)
                 first, _ = text_lengths(processor, record, questions)
                 if task == 'choice':
                     shape = choose_geometry(record, max(first)+63, context, budget=context*4//5)
@@ -185,21 +191,26 @@ def main(argv=None):
     parser.add_argument('--threshold', type=float, default=.25)
     parser.add_argument('--qa-context', type=int, default=QA_CONTEXT,
                         help=f'QA context in tokens (official: {QA_CONTEXT}); lower it to fit smaller GPUs')
+    parser.add_argument('--grounding-fps', type=float, default=4., help='Grounding frame sampling rate (official: 4)')
     parser.add_argument('--qa-fps', type=float, default=2., help='QA frame sampling rate (official: 2)')
     parser.add_argument('--max-frames', type=int, default=2048, help='Full-video frame cap (official: 2048)')
     parser.add_argument('--dry-run', action='store_true', help='Validate manifests without loading weights')
+    parser.add_argument('--limit-videos', type=int, help='Evaluate only N randomly sampled videos (custom manifests only)')
+    parser.add_argument('--limit-seed', type=int, default=0, help='Seed for --limit-videos sampling')
     args = parser.parse_args(argv)
     if args.plans and args.manifest:
         parser.error('Use either --plans or --manifest')
+    if args.limit_videos is not None and (args.limit_videos < 1 or not args.manifest):
+        parser.error('--limit-videos must be positive and requires --manifest')
     if not 0 < args.threshold < 1 or args.grounding_context < 64 or args.qa_context < 64:
         parser.error('threshold must be in (0,1); contexts must be at least 64')
-    if args.qa_fps <= 0 or args.max_frames < 1:
-        parser.error('qa-fps and max-frames must be positive')
-    if args.plans and (args.qa_context, args.qa_fps, args.max_frames) != (QA_CONTEXT, 2., 2048):
+    if args.qa_fps <= 0 or args.grounding_fps <= 0 or args.max_frames < 1:
+        parser.error('qa-fps, grounding-fps and max-frames must be positive')
+    if args.plans and (args.qa_context, args.qa_fps, args.grounding_fps, args.max_frames) != (QA_CONTEXT, 2., 4., 2048):
         parser.error('--plans fix the official QA context/fps/frames; omit the overrides')
     datasets = evaluation_inputs(args)
     if args.dry_run:
-        print(json.dumps({n: dict(questions=len(v['rows']), qa_context=args.qa_context, qa_fps=args.qa_fps,
+        print(json.dumps({n: dict(questions=len(v['rows']), qa_context=args.qa_context, qa_fps=args.qa_fps, grounding_fps=args.grounding_fps,
                                   max_frames=args.max_frames) for n, v in datasets.items()}))
         return
     import torch
@@ -232,7 +243,7 @@ def main(argv=None):
             owned = set(videos[rank::world])
             local = [r for r in rows if r['video_key'] in owned]
             predictions = predict_rows(model, processor, local, args.grounding_context, args.threshold, dataset['plan'],
-                                       args.qa_context, args.qa_fps, args.max_frames, rank)
+                                       args.qa_context, args.qa_fps, args.max_frames, rank, args.grounding_fps)
             write_jsonl(predictions, target/f'rank{rank}.jsonl')
             if world > 1:
                 dist.barrier()
@@ -242,7 +253,7 @@ def main(argv=None):
                 report = score_predictions(name, merged, rows, dataset['reference'], target, args.qa_context)
                 report.update(checkpoint_id=native.get('checkpoint_id'), manifest_sha256=sha256(dataset['manifest']),
                     grounding_context=args.grounding_context, qa_context=args.qa_context,
-                    threshold=args.threshold, max_frames=args.max_frames, grounding_fps=4., qa_fps=args.qa_fps)
+                    threshold=args.threshold, max_frames=args.max_frames, grounding_fps=args.grounding_fps, qa_fps=args.qa_fps)
                 save_json(report, target/'metrics.json')
                 summary[name] = report
     if rank == 0:
