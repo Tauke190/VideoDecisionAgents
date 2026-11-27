@@ -413,8 +413,10 @@ def main():
         def grade(predict_str, ground_truth, question):
             prompt = build_judge_prompt(predict_str, ground_truth, question)
             response = client.chat.completions.create(
-                model=model_name, max_tokens=5,
-                messages=[{'role': 'user', 'content': [{'type': 'text', 'text': prompt}]}])
+                model=model_name, max_tokens=5, temperature=0,
+                messages=[{'role': 'user', 'content': [{'type': 'text', 'text': prompt}]}],
+                # Qwen3 thinks by default; 5 tokens of "<think>" would parse as 0 (same as the local backend).
+                extra_body={'chat_template_kwargs': {'enable_thinking': False}})
             reply = response.choices[0].message.content or ''
             return parse_binary(reply), reply
     else:

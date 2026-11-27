@@ -2,6 +2,7 @@
 
 Only sampling/shape metadata may be persisted. No learned video features are read.
 """
+from .video import decode_threads
 import json
 import math
 from pathlib import Path
@@ -40,7 +41,7 @@ def probe_video_geometry(path):
     import av
     with av.open(str(path)) as container:
         stream = container.streams.video[0]
-        stream.thread_type, stream.thread_count = 'AUTO', 2
+        stream.thread_type, stream.thread_count = 'AUTO', decode_threads()
         first = next(container.decode(stream))
         if first.pts is None:
             raise ValueError(f'Missing initial video PTS: {path}')
@@ -194,7 +195,7 @@ def sampled_chunks(record, chunk_frames=32):
         index, previous, previous_time, origin, end_time = 0, None, 0., None, 0.
         with av.open(source['path']) as container:
             stream = container.streams.video[0]
-            stream.thread_type, stream.thread_count = 'AUTO', 2
+            stream.thread_type, stream.thread_count = 'AUTO', decode_threads()
             for frame in container.decode(stream):
                 if frame.pts is None:
                     raise ValueError('Missing source video PTS')

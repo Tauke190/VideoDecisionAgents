@@ -51,7 +51,8 @@ def convert(root, out, annotations):
             raise ValueError(f'Bad clue intervals for qid {item["qid"]}')
         rows.append(dict(id=f'cgbench/{vid}/{item["qid"]}', task='grounding', video_key=f'cgbench/{vid}',
                          video_path=f'videos/{vid}.mp4', duration=duration, query=item['question'],
-                         spans=spans, source='CG-Bench', split='test',
+                         spans=spans, answer=item['answer'], choices=item['choices'],
+                         right_answer=item['right_answer'], source='CG-Bench', split='test',
                          domain=item['domain'], sub_category=item['sub_category']))
         entry = official.setdefault(vid, dict(duration=duration, spans=[], queries=[]))
         entry['spans'].append(spans)

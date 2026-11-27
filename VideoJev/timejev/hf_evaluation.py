@@ -1,5 +1,6 @@
 """Evaluate released HF checkpoints with labeled JSONL manifests."""
 import argparse
+import os
 import json
 from datetime import timedelta
 from pathlib import Path
@@ -194,12 +195,18 @@ def main(argv=None):
     parser.add_argument('--grounding-fps', type=float, default=4., help='Grounding frame sampling rate (official: 4)')
     parser.add_argument('--qa-fps', type=float, default=2., help='QA frame sampling rate (official: 2)')
     parser.add_argument('--max-frames', type=int, default=2048, help='Full-video frame cap (official: 2048)')
+    parser.add_argument('--decode-threads', type=int,
+                        help='FFmpeg decoder threads per process (default: $VIDEOJEV_DECODE_THREADS or 8)')
     parser.add_argument('--dry-run', action='store_true', help='Validate manifests without loading weights')
     parser.add_argument('--limit-videos', type=int, help='Evaluate only N randomly sampled videos (custom manifests only)')
     parser.add_argument('--limit-seed', type=int, default=0, help='Seed for --limit-videos sampling')
     args = parser.parse_args(argv)
     if args.plans and args.manifest:
         parser.error('Use either --plans or --manifest')
+    if args.decode_threads is not None:
+        if args.decode_threads < 1:
+            parser.error('--decode-threads must be >= 1')
+        os.environ['VIDEOJEV_DECODE_THREADS'] = str(args.decode_threads)
     if args.limit_videos is not None and (args.limit_videos < 1 or not args.manifest):
         parser.error('--limit-videos must be positive and requires --manifest')
     if not 0 < args.threshold < 1 or args.grounding_context < 64 or args.qa_context < 64:

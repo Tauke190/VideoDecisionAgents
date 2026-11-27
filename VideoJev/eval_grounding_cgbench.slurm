@@ -34,7 +34,7 @@ manifest=data/benchmarks/cgbench/questions.jsonl
 fps_list="${FPS_LIST:-2}"            # space-separated, e.g. "1 2"
 max_frames="${MAX_FRAMES:-1024}"     # uniform frame cap per video
 ctx="${CTX:-262144}"                 # grounding context; 262144 keeps native 480x832 frames at 1024 frames
-limit="${LIMIT:-}"                   # e.g. LIMIT=3 -> 3 random videos (all their questions) for a smoke test
+limit="${LIMIT:-}"                 # e.g. LIMIT=3 -> 3 random videos (all their questions) for a smoke test
 seed="${SEED:-0}"
 
 limit_args=""

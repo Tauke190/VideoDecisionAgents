@@ -5,5 +5,5 @@ source scripts/env.sh
 torchrun --standalone --nproc-per-node="${NPROC:-1}" scripts/evaluate_hf.py \
   --checkpoint ZhuYuhan/VideoJev-4B \
   --benchmark custom --manifest data/benchmarks/cgbench/questions.jsonl --out "${OUT:-runs/cgbench}" \
-  --grounding-context 60000 --grounding-fps "${FPS:-1}" --max-frames 512 \
+  --grounding-context 92000 --grounding-fps "${FPS:-1}" --max-frames 1024 \
   ${LIMIT:+--limit-videos "$LIMIT" --limit-seed "${SEED:-0}"} "$@"

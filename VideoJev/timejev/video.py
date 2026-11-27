@@ -4,6 +4,18 @@ import torch
 from .temporal import time_grid
 
 
+def decode_threads():
+    """FFmpeg decoder threads per process (env VIDEOJEV_DECODE_THREADS, default 8).
+
+    Threading changes speed only; decoded frames are identical.
+    """
+    import os
+    value = int(os.environ.get('VIDEOJEV_DECODE_THREADS', '8'))
+    if value < 1:
+        raise ValueError('VIDEOJEV_DECODE_THREADS must be >= 1')
+    return value
+
+
 def sampling_grid(duration, fps=2., max_frames=None):
     """Keep the requested fps unless the explicit full-video frame cap applies."""
     requested=time_grid(duration,fps)
@@ -25,7 +37,7 @@ def read_video(row, fps=2., *, max_frames=None):
     with av.open(row['video_path']) as container:
         stream = container.streams.video[0]
         stream.thread_type = 'AUTO'
-        stream.thread_count = 2
+        stream.thread_count = decode_threads()
         for frame in container.decode(stream):
             if frame.pts is None:
                 raise ValueError(f"Missing video PTS: {row['video_path']}")
